@@ -1,21 +1,34 @@
+// Parameters
 param code string = '5'
 param location string = 'Canada Central'
 @secure()
 param adminPassword string
 
-// Virtual Network
+// Virtual Network with two subnets
 resource vnet 'Microsoft.Network/virtualNetworks@2023-05-01' = {
   name: 'vnet-dev-calicot-cc-${code}'
   location: location
   properties: {
     addressSpace: {
-      addressPrefixes: ['10.0.0.0/16']
+      addressPrefixes: [
+        '10.0.0.0/16'
+      ]
     }
     subnets: [
       {
         name: 'snet-dev-web-cc-${code}'
         properties: {
           addressPrefix: '10.0.1.0/24'
+          // Delegation required for App Service VNET integration (if used)
+          delegations: [
+            {
+              name: 'delegation'
+              properties: {
+                serviceName: 'Microsoft.Web/serverFarms'
+              }
+            }
+          ]
+          // (Optional) Service endpoints if needed:
           serviceEndpoints: [
             {
               service: 'Microsoft.Web'
@@ -42,10 +55,11 @@ resource appServicePlan 'Microsoft.Web/serverfarms@2022-09-01' = {
     tier: 'Standard'
     capacity: 1
   }
+  properties: {}
 }
 
-// Web App
-resource webApp 'Microsoft.Web/sites@2024-04-01' = {
+// Web Application (App Service)
+resource webApp 'Microsoft.Web/sites@2022-09-01' = {
   name: 'app-calicot-dev-${code}'
   location: location
   identity: {
@@ -54,23 +68,29 @@ resource webApp 'Microsoft.Web/sites@2024-04-01' = {
   properties: {
     serverFarmId: appServicePlan.id
     httpsOnly: true
-    virtualNetworkSubnetId: resourceId(
-      'Microsoft.Network/virtualNetworks/subnets',
-      vnet.name,
-      'snet-dev-web-cc-${code}'
-    )
+    // Connection Strings: referencing the Key Vault secret using Key Vault reference syntax.
+    connectionStrings: [
+      {
+        name: 'DbConnection'
+        value: '@Microsoft.KeyVault(SecretUri=https://kv-calicot-dev-${code}.vault.azure.net/secrets/ConnectionStrings/)'
+        type: 'SQLAzure'
+      }
+    ]
     siteConfig: {
       alwaysOn: true
+      // App Settings with dynamic storage endpoint (avoid hardcoded "core.windows.net")
       appSettings: [
-        { name: 'ImageUrl', value: 'https://stcalicotprod000.blob.core.windows.net/images/' }
-        { name: 'WEBSITE_VNET_ROUTE_ALL', value: '1' }
-        { name: 'WEBSITE_RUN_FROM_PACKAGE', value: '1' }
+        {
+          name: 'ImageUrl'
+          value: 'https://stcalicotprod000.${environment().suffixes.storage}/images/'
+        }
       ]
     }
   }
+  tags: {}
 }
 
-// Autoscale settings
+// Autoscale Settings for the App Service Plan (scaling the web app)
 resource autoScale 'Microsoft.Insights/autoscalesettings@2015-04-01' = {
   name: 'autoscale-app-${code}'
   location: location
@@ -126,11 +146,11 @@ resource sqlDatabase 'Microsoft.Sql/servers/databases@2022-02-01-preview' = {
   name: 'sqldb-calicot-dev-${code}'
   parent: sqlServer
   location: location
-  properties: {}
   sku: {
     name: 'Basic'
     tier: 'Basic'
   }
+  properties: {}
 }
 
 // Key Vault
@@ -143,11 +163,12 @@ resource keyVault 'Microsoft.KeyVault/vaults@2022-11-01' = {
       family: 'A'
       name: 'standard'
     }
+    // Explicit empty array for access policies
     accessPolicies: []
   }
 }
 
-// Key Vault Access Policy
+// Key Vault Access Policy to grant web app managed identity Get and List on secrets
 resource kvAccessPolicy 'Microsoft.KeyVault/vaults/accessPolicies@2022-11-01' = {
   name: 'add'
   parent: keyVault
@@ -157,7 +178,10 @@ resource kvAccessPolicy 'Microsoft.KeyVault/vaults/accessPolicies@2022-11-01' = 
         tenantId: subscription().tenantId
         objectId: webApp.identity.principalId
         permissions: {
-          secrets: ['get', 'list']
+          secrets: [
+            'get'
+            'list'
+          ]
         }
       }
     ]
