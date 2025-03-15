@@ -1,0 +1,28 @@
+name: Feed Database
+
+on:
+  workflow_dispatch:
+
+jobs:
+  import-db:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Azure Login
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Import Database bacpac
+        run: |
+          az sql db import \
+            --admin-user sqladmin \
+            --admin-password ${{ secrets.ADMIN_PASSWORD }} \
+            --name sqldb-calicot-dev-5 \
+            --server sqlsrv-calicot-dev-5 \
+            --storage-key ${{ secrets.STORAGE_KEY }} \
+            --storage-key-type StorageAccessKey \
+            --storage-uri "https://<yourStorageAccountName>.blob.core.windows.net/db/Auctions_Data.bacpac"

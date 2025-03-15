@@ -1,0 +1,28 @@
+name: Deploy Infrastructure
+
+on:
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Azure Login
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Deploy Bicep Template (Infrastructure)
+        run: |
+          az deployment group create \
+            --resource-group rg-calicot-web-dev-5 \
+            --template-file infra/main.bicep \
+            --parameters code=5 adminPassword=${{ secrets.ADMIN_PASSWORD }}
+
+      - name: Verify Infrastructure Deployment
+        run: |
+          az resource list --resource-group rg-calicot-web-dev-5 --query "[].{name:name, type:type}" -o table
