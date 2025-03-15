@@ -59,7 +59,7 @@ resource webApp 'Microsoft.Web/sites@2022-09-01' = {
       appSettings: [
         {
           name: 'ImageUrl'
-          value: 'https://stcalicotprod000.blob.core.windows.net/images/'
+          value: 'https://stcalicotprod000.${environment().suffixes.storage}/images/'
         }
         {
           name: 'WEBSITE_VNET_ROUTE_ALL'
@@ -93,14 +93,14 @@ resource autoScale 'Microsoft.Insights/autoscalesettings@2015-04-01' = {
           {
             metricTrigger: {
               metricName: 'CpuPercentage'
-              metricResourceUri: webApp.id
+              metricResourceUri: appServicePlan.id
               timeGrain: 'PT1M'
               statistic: 'Average'
               timeWindow: 'PT5M'
               timeAggregation: 'Average'
               operator: 'GreaterThan'
               threshold: 70
-            }
+            }            
             scaleAction: {
               direction: 'Increase'
               type: 'ChangeCount'
@@ -130,13 +130,15 @@ resource sqlServer 'Microsoft.Sql/servers@2022-02-01-preview' = {
 resource sqlDatabase 'Microsoft.Sql/servers/databases@2022-02-01-preview' = {
   name: 'sqldb-calicot-dev-${code}'
   parent: sqlServer
+  location: location
   properties: {
-    sku: {
-      name: 'Basic'
-      tier: 'Basic'
-    }
+  }
+  sku: {
+    name: 'Basic'
+    tier: 'Basic'
   }
 }
+
 
 // Key Vault
 resource keyVault 'Microsoft.KeyVault/vaults@2022-11-01' = {
