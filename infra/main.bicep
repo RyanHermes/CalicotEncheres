@@ -3,23 +3,9 @@ param location string = 'Canada Central'
 @secure()
 param adminPassword string
 
-// Declare the storage account name
-var storageAccountName = 'stgcalicot${code}'
-
-// Storage account resource
-resource storageAccount 'Microsoft.Storage/storageAccounts@2022-09-01' = {
-  name: storageAccountName
-  location: location
-  sku: {
-    name: 'Standard_LRS'
-  }
-  kind: 'StorageV2'
-  properties: {}
-}
-
 // Virtual Network
 resource vnet 'Microsoft.Network/virtualNetworks@2023-05-01' = {
-  name: 'vnet-calicot-${code}'
+  name: 'vnet-dev-calicot-cc-${code}'
   location: location
   properties: {
     addressSpace: {
@@ -27,12 +13,21 @@ resource vnet 'Microsoft.Network/virtualNetworks@2023-05-01' = {
     }
     subnets: [
       {
-        name: 'snet-web-${code}'
-        properties: { addressPrefix: '10.0.1.0/24' }
+        name: 'snet-dev-web-cc-${code}'
+        properties: {
+          addressPrefix: '10.0.1.0/24'
+          serviceEndpoints: [
+            {
+              service: 'Microsoft.Web'
+            }
+          ]
+        }
       }
       {
-        name: 'snet-db-${code}'
-        properties: { addressPrefix: '10.0.2.0/24' }
+        name: 'snet-dev-db-cc-${code}'
+        properties: {
+          addressPrefix: '10.0.2.0/24'
+        }
       }
     ]
   }
@@ -40,24 +35,42 @@ resource vnet 'Microsoft.Network/virtualNetworks@2023-05-01' = {
 
 // App Service Plan
 resource appServicePlan 'Microsoft.Web/serverfarms@2022-09-01' = {
-  name: 'plan-calicot-${code}'
+  name: 'plan-calicot-dev-${code}'
   location: location
-  sku: { name: 'S1', tier: 'Standard', capacity: 1 }
+  sku: {
+    name: 'S1'
+    tier: 'Standard'
+    capacity: 1
+  }
 }
 
 // Web App
 resource webApp 'Microsoft.Web/sites@2022-09-01' = {
-  name: 'app-calicot-${code}'
+  name: 'app-calicot-dev-${code}'
   location: location
-  identity: { type: 'SystemAssigned' }
+  identity: {
+    type: 'SystemAssigned'
+  }
   properties: {
     serverFarmId: appServicePlan.id
     httpsOnly: true
     siteConfig: {
       alwaysOn: true
       appSettings: [
-        { name: 'ImageUrl', value: 'https://${storageAccountName}.blob.${environment().suffixes.storage}/images/' }
+        {
+          name: 'ImageUrl'
+          value: 'https://stcalicotprod000.blob.core.windows.net/images/'
+        }
+        {
+          name: 'WEBSITE_VNET_ROUTE_ALL'
+          value: '1'
+        }
+        {
+          name: 'WEBSITE_RUN_FROM_PACKAGE'
+          value: '1'
+        }
       ]
+      virtualNetworkSubnetId: resourceId('Microsoft.Network/virtualNetworks/subnets', vnet.name, 'snet-dev-web-cc-${code}')
     }
   }
 }
@@ -71,7 +84,11 @@ resource autoScale 'Microsoft.Insights/autoscalesettings@2015-04-01' = {
     profiles: [
       {
         name: 'defaultProfile'
-        capacity: { minimum: '1', maximum: '2', default: '1' }
+        capacity: {
+          minimum: '1'
+          maximum: '2'
+          default: '1'
+        }
         rules: [
           {
             metricTrigger: {
@@ -84,7 +101,12 @@ resource autoScale 'Microsoft.Insights/autoscalesettings@2015-04-01' = {
               operator: 'GreaterThan'
               threshold: 70
             }
-            scaleAction: { direction: 'Increase', type: 'ChangeCount', value: '1', cooldown: 'PT5M' }
+            scaleAction: {
+              direction: 'Increase'
+              type: 'ChangeCount'
+              value: '1'
+              cooldown: 'PT5M'
+            }
           }
         ]
       }
@@ -94,8 +116,8 @@ resource autoScale 'Microsoft.Insights/autoscalesettings@2015-04-01' = {
 }
 
 // SQL Server
-resource sqlServer 'Microsoft.Sql/servers@2022-02-01' = {
-  name: 'sqlsrv-calicot-${code}'
+resource sqlServer 'Microsoft.Sql/servers@2022-02-01-preview' = {
+  name: 'sqlsrv-calicot-dev-${code}'
   location: location
   properties: {
     administratorLogin: 'sqladmin'
@@ -105,29 +127,28 @@ resource sqlServer 'Microsoft.Sql/servers@2022-02-01' = {
 }
 
 // SQL Database
-resource sqlDatabase 'Microsoft.Sql/servers/databases@2022-02-01' = {
-  name: 'sqldb-calicot-${code}'
+resource sqlDatabase 'Microsoft.Sql/servers/databases@2022-02-01-preview' = {
+  name: 'sqldb-calicot-dev-${code}'
   parent: sqlServer
   properties: {
-    sku: { name: 'Basic', tier: 'Basic' }
+    sku: {
+      name: 'Basic'
+      tier: 'Basic'
+    }
   }
 }
 
 // Key Vault
 resource keyVault 'Microsoft.KeyVault/vaults@2022-11-01' = {
-  name: 'kv-calicot-${code}'
+  name: 'kv-calicot-dev-${code}'
   location: location
   properties: {
     tenantId: subscription().tenantId
-    sku: { family: 'A', name: 'standard' }
+    sku: {
+      family: 'A'
+      name: 'standard'
+    }
   }
-}
-
-// Key Vault Secret
-resource keyVaultSecret 'Microsoft.KeyVault/vaults/secrets@2022-11-01' = {
-  name: 'ConnectionStrings'
-  parent: keyVault
-  properties: { value: 'your-connection-string-here' }
 }
 
 // Key Vault Access Policy
@@ -140,7 +161,7 @@ resource kvAccessPolicy 'Microsoft.KeyVault/vaults/accessPolicies@2022-11-01' = 
         tenantId: subscription().tenantId
         objectId: webApp.identity.principalId
         permissions: {
-          secrets: ['get']
+          secrets: ['get', 'list']
         }
       }
     ]
