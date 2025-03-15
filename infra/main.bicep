@@ -45,7 +45,7 @@ resource appServicePlan 'Microsoft.Web/serverfarms@2022-09-01' = {
 }
 
 // Web App
-resource webApp 'Microsoft.Web/sites@2022-09-01' = {
+resource webApp 'Microsoft.Web/sites@2024-04-01' = {
   name: 'app-calicot-dev-${code}'
   location: location
   identity: {
@@ -54,23 +54,18 @@ resource webApp 'Microsoft.Web/sites@2022-09-01' = {
   properties: {
     serverFarmId: appServicePlan.id
     httpsOnly: true
+    virtualNetworkSubnetId: resourceId(
+      'Microsoft.Network/virtualNetworks/subnets',
+      vnet.name,
+      'snet-dev-web-cc-${code}'
+    )
     siteConfig: {
       alwaysOn: true
       appSettings: [
-        {
-          name: 'ImageUrl'
-          value: 'https://stcalicotprod000.${environment().suffixes.storage}/images/'
-        }
-        {
-          name: 'WEBSITE_VNET_ROUTE_ALL'
-          value: '1'
-        }
-        {
-          name: 'WEBSITE_RUN_FROM_PACKAGE'
-          value: '1'
-        }
+        { name: 'ImageUrl', value: 'https://stcalicotprod000.blob.core.windows.net/images/' }
+        { name: 'WEBSITE_VNET_ROUTE_ALL', value: '1' }
+        { name: 'WEBSITE_RUN_FROM_PACKAGE', value: '1' }
       ]
-      virtualNetworkSubnetId: resourceId('Microsoft.Network/virtualNetworks/subnets', vnet.name, 'snet-dev-web-cc-${code}')
     }
   }
 }
@@ -100,7 +95,7 @@ resource autoScale 'Microsoft.Insights/autoscalesettings@2015-04-01' = {
               timeAggregation: 'Average'
               operator: 'GreaterThan'
               threshold: 70
-            }            
+            }
             scaleAction: {
               direction: 'Increase'
               type: 'ChangeCount'
@@ -131,14 +126,12 @@ resource sqlDatabase 'Microsoft.Sql/servers/databases@2022-02-01-preview' = {
   name: 'sqldb-calicot-dev-${code}'
   parent: sqlServer
   location: location
-  properties: {
-  }
+  properties: {}
   sku: {
     name: 'Basic'
     tier: 'Basic'
   }
 }
-
 
 // Key Vault
 resource keyVault 'Microsoft.KeyVault/vaults@2022-11-01' = {
@@ -150,6 +143,7 @@ resource keyVault 'Microsoft.KeyVault/vaults@2022-11-01' = {
       family: 'A'
       name: 'standard'
     }
+    accessPolicies: []
   }
 }
 
