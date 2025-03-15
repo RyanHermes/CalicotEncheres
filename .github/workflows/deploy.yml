@@ -24,7 +24,7 @@ jobs:
           az deployment group create \
             --resource-group rg-calicot-web-dev-5 \
             --template-file infra/main.bicep \
-            --parameters codeId=5
+            --parameters code=5
 
       - name: Verify Deployment
         run: |
