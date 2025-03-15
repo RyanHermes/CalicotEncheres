@@ -17,17 +17,14 @@ jobs:
       - name: Azure Login
         uses: azure/login@v1
         with:
-          client-id: ${{ secrets.AZURE_CLIENT_ID }}
-          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-          client-secret: ${{ secrets.AZURE_CLIENT_SECRET }}
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
 
       - name: Deploy Bicep Template
         run: |
           az deployment group create \
             --resource-group rg-calicot-web-dev-5 \
             --template-file infra/main.bicep \
-            --parameters codeId=5 || exit 1  # Ensures failure if deployment fails
+            --parameters codeId=5
 
       - name: Verify Deployment
         run: |
