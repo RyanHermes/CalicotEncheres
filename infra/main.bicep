@@ -68,17 +68,15 @@ resource webApp 'Microsoft.Web/sites@2022-09-01' = {
   properties: {
     serverFarmId: appServicePlan.id
     httpsOnly: true
-    // Connection Strings: referencing the Key Vault secret using Key Vault reference syntax.
-    connectionStrings: [
-      {
-        name: 'DbConnection'
-        value: '@Microsoft.KeyVault(SecretUri=https://kv-calicot-dev-${code}.vault.azure.net/secrets/ConnectionStrings/)'
-        type: 'SQLAzure'
-      }
-    ]
     siteConfig: {
       alwaysOn: true
-      // App Settings with dynamic storage endpoint (avoid hardcoded "core.windows.net")
+      connectionStrings: [
+        {
+          name: 'DbConnection'
+          connectionString: '@Microsoft.KeyVault(SecretUri=https://kv-calicot-dev-${code}.vault.azure.net/secrets/ConnectionStrings/)'
+          type: 'SQLAzure'
+        }
+      ]
       appSettings: [
         {
           name: 'ImageUrl'
