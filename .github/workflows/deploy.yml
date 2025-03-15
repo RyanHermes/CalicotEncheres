@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+  workflow_dispatch:
 
 jobs:
   deploy:
@@ -12,9 +13,6 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
-
-      - name: Setup Azure CLI
-        uses: azure/setup-azure-cli@v1
 
       - name: Azure Login
         uses: azure/login@v1
@@ -29,4 +27,8 @@ jobs:
           az deployment group create \
             --resource-group rg-calicot-web-dev-5 \
             --template-file infra/main.bicep \
-            --parameters codeId=5
+            --parameters codeId=5 || exit 1  # Ensures failure if deployment fails
+
+      - name: Verify Deployment
+        run: |
+          az resource list --resource-group rg-calicot-web-dev-5 --query "[].{name:name,type:type}" -o table
